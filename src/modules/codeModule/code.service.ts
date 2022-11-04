@@ -5,11 +5,14 @@ import axios from "axios";
 import { CodingEvaluationRequestDtoFe, JudgeSubmission, JudgeSubmitDto } from "src/submodules/Assessment-Platform-Dtos/src/dtos/codingEvaluation.dto";
 import { EvaluationResponseFe, Token } from "src/submodules/Assessment-Platform-Dtos/src/dtos/questionDraft.dto";
 import { CodingQuestionDraft } from "src/submodules/Assessment-Platform-Entities/src/schemas/codingQuestionDraft.schema";
+import { SocketGateway } from "../socket/gateway";
+import { JudgeStatus } from "src/submodules/Assessment-Platform-Dtos/src/enums/judgeStatus.enum";
 
 @Injectable()
 export class CodeService{
 
     constructor(
+        private socket:SocketGateway,
         @InjectModel('codingQuestionDraft') private readonly codingQuestionDraftModel:Model<CodingQuestionDraft>
     ){}
 
@@ -42,13 +45,13 @@ export class CodeService{
            judgeEvaluatedResponse.map(async(submission,index)=>{
             submission['testCase']=returningTestCases[index]
             })
-
-            let compileFeResponse:EvaluationResponseFe={
-                questionId:codePayload.questionId,
-                submissions:judgeEvaluatedResponse
-            }
+            await this.reCheckTokens(judgeEvaluatedResponse);
+        //     let compileFeResponse:EvaluationResponseFe={
+        //         questionId:codePayload.questionId,
+        //         submissions:judgeEvaluatedResponse
+        //     }
             
-        return compileFeResponse;
+        // return compileFeResponse;
     }
 
     async judgeEvaluation(evaluationPayload:JudgeSubmitDto){
@@ -63,6 +66,31 @@ export class CodeService{
             let evaluationResponse = (await axios.get(`https://judge-staging.refactor.academy/submissions/batch?tokens=${tokens}&base64_encoded=true`)).data;
 
             return evaluationResponse.submissions
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    async reCheckTokens(payload){
+        try {
+            let pending=[];
+            if(payload.length<1){
+                return
+            }
+            await Promise.all(payload.map(async(submission)=>{
+                    let submissionStatus = ((await axios.get(`https://judge-staging.refactor.academy/submissions/batch?tokens=${submission.token}&base64_encoded=true`)).data).submissions[0];
+                    submissionStatus['testCase'] = submission.testCase;
+                    if(submissionStatus.status.description == JudgeStatus.IN_QUEUE || submissionStatus.status.description == JudgeStatus.PROCESSING ){
+                        pending.push(submissionStatus);
+                    }
+                    else{
+                        this.socket.server.emit('compileResponse',submissionStatus)
+                    }
+                }
+            ))
+            console.log(`pending sample len: `,pending.length)
+            console.log(`--------------------------------------------`)
+            await this.reCheckTokens(pending)
         } catch (error) {
             console.log(error)
         }

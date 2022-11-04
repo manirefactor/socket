@@ -1,7 +1,8 @@
 import { Module } from "@nestjs/common";
 import { MongooseModule } from "@nestjs/mongoose";
 import { CodingQuestionDraftSchema } from "src/submodules/Assessment-Platform-Entities/src/schemas/codingQuestionDraft.schema";
-import { CodeGateway } from "./code.gateway";
+import { SocketGateway } from "../socket/gateway";
+import { CodeController } from "./code.controller";
 import { CodeService } from "./code.service";
 @Module({
     imports:[
@@ -9,6 +10,7 @@ import { CodeService } from "./code.service";
             {name:'codingQuestionDraft',schema:CodingQuestionDraftSchema}
         ])
     ],
-    providers:[CodeGateway,CodeService]
+    providers:[CodeService,SocketGateway],
+    controllers:[CodeController]
 })
 export class codeModule{}
