@@ -1,0 +1,6 @@
+[submodule "src/submodules/Assessment-Platform-Dtos"]
+	path = src/submodules/Assessment-Platform-Dtos
+	url = git@github.com:RefactorAcademy/Assessment-Platform-Dtos.git
+[submodule "src/submodules/Assessment-Platform-Entities"]
+	path = src/submodules/Assessment-Platform-Entities
+	url = git@github.com:RefactorAcademy/Assessment-Platform-Entities.git
