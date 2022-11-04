@@ -17,41 +17,42 @@ export class CodeService{
     ){}
 
     async runCode(codePayload:CodingEvaluationRequestDtoFe){
-        let sampleTestCases:any = await this.codingQuestionDraftModel.findOne({questionId:codePayload.questionId},{
-            sampleCases:1,
-        }).lean();
-        
-        if(!sampleTestCases || sampleTestCases.sampleCases.sampleTestCases.length<1 ||(codePayload && !codePayload.sourceCode)|| !codePayload.languageId){
-            return null;
-        }
-
-        let judgePayload=[];
-            let returningTestCases=[];
-            sampleTestCases.sampleCases.sampleTestCases.map((testCase: { sampleInput: string; sampleOutput: string; })=>{
-                let judgeSubmissionPayload: JudgeSubmission={
-                    language_id : codePayload.languageId,
-                    source_code:codePayload.sourceCode,
-                    /* the character \ is used to escape the special charater in mongo,that is the reason
-                    for the \\n,  below replace function is written to replace the \\n with the \n */
-                    stdin:testCase.sampleInput.replace(/\\n/g,'\n'),
-                    expected_output:testCase.sampleOutput.replace(/\\n/g,'\n')
-                };
-                returningTestCases.push({input:judgeSubmissionPayload.stdin,output:judgeSubmissionPayload.expected_output})
-                judgePayload.push(judgeSubmissionPayload);
-           })
-
-           let judgeEvaluatedResponse = await this.judgeEvaluation({submissions:judgePayload});
-
-           judgeEvaluatedResponse.map(async(submission,index)=>{
-            submission['testCase']=returningTestCases[index]
-            })
-            await this.reCheckTokens(judgeEvaluatedResponse);
-        //     let compileFeResponse:EvaluationResponseFe={
-        //         questionId:codePayload.questionId,
-        //         submissions:judgeEvaluatedResponse
-        //     }
+        try {
+            let sampleTestCases:any = await this.codingQuestionDraftModel.findOne({questionId:codePayload.questionId},{
+                sampleCases:1,
+            }).lean();
             
-        // return compileFeResponse;
+            if(!sampleTestCases || sampleTestCases.sampleCases.sampleTestCases.length<1 ||(codePayload && !codePayload.sourceCode)|| !codePayload.languageId){
+                return null;
+            }
+    
+            let judgePayload=[];
+                let returningTestCases=[];
+                sampleTestCases.sampleCases.sampleTestCases.map((testCase: { sampleInput: string; sampleOutput: string; })=>{
+                    let judgeSubmissionPayload: JudgeSubmission={
+                        language_id : codePayload.languageId,
+                        source_code:codePayload.sourceCode,
+                        /* the character \ is used to escape the special charater in mongo,that is the reason
+                        for the \\n,  below replace function is written to replace the \\n with the \n */
+                        stdin:testCase.sampleInput.replace(/\\n/g,'\n'),
+                        expected_output:testCase.sampleOutput.replace(/\\n/g,'\n')
+                    };
+                    returningTestCases.push({input:judgeSubmissionPayload.stdin,output:judgeSubmissionPayload.expected_output})
+                    judgePayload.push(judgeSubmissionPayload);
+               })
+    
+               let judgeEvaluatedResponse = await this.judgeEvaluation({submissions:judgePayload});
+    
+               judgeEvaluatedResponse.map(async(submission,index)=>{
+                submission['testCase']=returningTestCases[index]
+                })
+                //Creating Unique Event to Emit to Client.
+                let unique_user_event = `${codePayload.userId}_${codePayload.examId}_${codePayload.questionId}`;
+                await this.reCheckTokens(judgeEvaluatedResponse,unique_user_event);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
     }
 
     async judgeEvaluation(evaluationPayload:JudgeSubmitDto){
@@ -65,17 +66,18 @@ export class CodeService{
 
             let evaluationResponse = (await axios.get(`https://judge-staging.refactor.academy/submissions/batch?tokens=${tokens}&base64_encoded=true`)).data;
 
-            return evaluationResponse.submissions
+            return evaluationResponse.submissions;
         } catch (error) {
-            console.log(error)
+            console.log(error);
+            throw error;
         }
     }
 
-    async reCheckTokens(payload){
+    async reCheckTokens(payload: any[],event: string){
         try {
             let pending=[];
             if(payload.length<1){
-                return
+                return this.socket.server.emit(event,{status:200,message:"Compilation Done!"});
             }
             await Promise.all(payload.map(async(submission)=>{
                     let submissionStatus = ((await axios.get(`https://judge-staging.refactor.academy/submissions/batch?tokens=${submission.token}&base64_encoded=true`)).data).submissions[0];
@@ -84,15 +86,16 @@ export class CodeService{
                         pending.push(submissionStatus);
                     }
                     else{
-                        this.socket.server.emit('compileResponse',submissionStatus)
+                        this.socket.server.emit(event,submissionStatus)
                     }
                 }
             ))
             console.log(`pending sample len: `,pending.length)
             console.log(`--------------------------------------------`)
-            await this.reCheckTokens(pending)
+            await this.reCheckTokens(pending,event)
         } catch (error) {
             console.log(error)
+            throw error;
         }
     }
 }

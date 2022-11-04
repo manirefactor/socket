@@ -12,8 +12,8 @@ export class CodeController{
 
     @Post('runCode')
     async runCode(@Body() codePayload:CodingEvaluationRequestDtoFe){
-        try {
-            await this.codeService.runCode(codePayload);
+        try { 
+            this.codeService.runCode(codePayload);
         } catch (error) {
             return new CustomResponse(500,`Running Code: Internal Error`,error);
         }        
