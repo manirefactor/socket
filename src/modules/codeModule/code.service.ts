@@ -7,6 +7,7 @@ import { EvaluationResponseFe, Token } from "src/submodules/Assessment-Platform-
 import { CodingQuestionDraft } from "src/submodules/Assessment-Platform-Entities/src/schemas/codingQuestionDraft.schema";
 import { SocketGateway } from "../socket/gateway";
 import { JudgeStatus } from "src/submodules/Assessment-Platform-Dtos/src/enums/judgeStatus.enum";
+import { judge0Endpoints } from "src/constants/judge0Routes";
 
 @Injectable()
 export class CodeService{
@@ -58,13 +59,13 @@ export class CodeService{
     async judgeEvaluation(evaluationPayload:JudgeSubmitDto){
         try {
 
-            let generatedTokens:Token[] = (await axios.post(`https://judge-staging.refactor.academy/submissions/batch`,evaluationPayload)).data;
+            let generatedTokens:Token[] = (await axios.post(`${judge0Endpoints.BATCH}`,evaluationPayload)).data;
             console.log(`No.of Submissions for Evaluation: ${generatedTokens.length}`)
 
             let tokens:string='';
             generatedTokens.forEach(tokenObj => tokens += tokenObj.token+',');
 
-            let evaluationResponse = (await axios.get(`https://judge-staging.refactor.academy/submissions/batch?tokens=${tokens}&base64_encoded=true`)).data;
+            let evaluationResponse = (await axios.get(`${judge0Endpoints.BATCH}?tokens=${tokens}&base64_encoded=true`)).data;
 
             return evaluationResponse.submissions;
         } catch (error) {
@@ -80,7 +81,7 @@ export class CodeService{
                 return this.socket.server.emit(event,{status:200,message:"Compilation Done!"});
             }
             await Promise.all(payload.map(async(submission)=>{
-                    let submissionStatus = ((await axios.get(`https://judge-staging.refactor.academy/submissions/batch?tokens=${submission.token}&base64_encoded=true`)).data).submissions[0];
+                    let submissionStatus = ((await axios.get(`${judge0Endpoints.BATCH}?tokens=${submission.token}&base64_encoded=true`)).data).submissions[0];
                     submissionStatus['testCase'] = submission.testCase;
                     if(submissionStatus.status.description == JudgeStatus.IN_QUEUE || submissionStatus.status.description == JudgeStatus.PROCESSING ){
                         pending.push(submissionStatus);
