@@ -1,0 +1,30 @@
+name: 'Netlify Previews'
+
+on:
+  push:
+    branches: 'master'
+
+jobs:
+  deploy:
+    name: 'Deploy'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      # Sets the branch name as environment variable
+      - uses: nelonoel/branch-name@v1.0.1
+      - uses: jsmrcaga/action-netlify-deploy@master
+        with:
+          NETLIFY_AUTH_TOKEN: VWnw4TML6a1_x8Rw6DlQJ7u2EgWdl09ir2ItYPQg4b4
+          NETLIFY_SITE_ID: d7b97815-03da-4003-9bc2-b60b2a17f8fb
+          deploy_alias: ${{ env.BRANCH_NAME }}
+      
+      # Creates a status check with link to preview
+      - name: Status check
+        uses: Sibz/github-status-action@v1.1.1
+        with:
+          authToken: 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
+          context: Netlify preview
+          state: success
+          target_url: https://master--my-socket.netlify.app
